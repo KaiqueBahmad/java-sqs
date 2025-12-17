@@ -1,0 +1,30 @@
+# Application
+spring.application.name=javasqs
+server.port=8080
+
+# H2 Database
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
+
+# H2 Console
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+
+# JPA/Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# AWS SQS
+spring.cloud.aws.region.static=us-east-1
+spring.cloud.aws.credentials.access-key=your-access-key
+spring.cloud.aws.credentials.secret-key=your-secret-key
+spring.cloud.aws.sqs.endpoint=https://sqs.us-east-1.amazonaws.com
+
+# Logging
+logging.level.root=INFO
+logging.level.kaiquebt.dev=DEBUG
+logging.level.org.springframework.web=DEBUG
