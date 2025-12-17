@@ -49,6 +49,8 @@ bin/
 Thumbs.db
 
 # Spring Boot
+src/main/resources/application.properties
+
 application-*.properties
 application-*.yml
 !application-*.properties.example
