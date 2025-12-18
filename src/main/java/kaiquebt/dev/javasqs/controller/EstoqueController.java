@@ -44,14 +44,6 @@ public class EstoqueController {
         return ResponseEntity.ok(estoqueAtualizado);
     }
 
-    @PatchMapping("/produto/{produtoId}/remover")
-    public ResponseEntity<EstoqueDTO> removerQuantidade(
-            @PathVariable UUID produtoId,
-            @RequestBody EstoqueAjusteDTO dto) {
-        EstoqueDTO estoqueAtualizado = estoqueService.removerQuantidade(produtoId, dto.getQuantidade());
-        return ResponseEntity.ok(estoqueAtualizado);
-    }
-
     @DeleteMapping("/produto/{produtoId}")
     public ResponseEntity<Void> deletar(@PathVariable UUID produtoId) {
         estoqueService.deletar(produtoId);

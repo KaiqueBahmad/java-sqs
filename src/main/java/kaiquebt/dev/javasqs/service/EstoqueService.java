@@ -39,21 +39,11 @@ public class EstoqueService {
                 .orElseThrow(() -> new RuntimeException("Estoque não encontrado para produto id: " + produtoId));
 
         estoque.setQuantidade(estoque.getQuantidade() + quantidade);
-        Estoque estoqueAtualizado = estoqueRepository.save(estoque);
-        return estoqueMapper.toDTO(estoqueAtualizado);
-    }
 
-    @Transactional
-    public EstoqueDTO removerQuantidade(UUID produtoId, Integer quantidade) {
-        Estoque estoque = estoqueRepository.findById(produtoId)
-                .orElseThrow(() -> new RuntimeException("Estoque não encontrado para produto id: " + produtoId));
-
-        int novaQuantidade = estoque.getQuantidade() - quantidade;
-        if (novaQuantidade < 0) {
+        if (estoque.getQuantidade() < 0) {
             throw new RuntimeException("Quantidade insuficiente em estoque. Disponível: " + estoque.getQuantidade());
         }
 
-        estoque.setQuantidade(novaQuantidade);
         Estoque estoqueAtualizado = estoqueRepository.save(estoque);
         return estoqueMapper.toDTO(estoqueAtualizado);
     }

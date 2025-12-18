@@ -5,7 +5,10 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import kaiquebt.dev.javasqs.model.Pedido;
@@ -21,7 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 public class PedidoConsumer {
     private final PedidoQueueProducer pedidoQueueProducer;
     private final PedidoRepository pedidoRepository;
-    private final ObjectMapper objectMapper;
 
     @Value("${sqs.queues.pedido_log}")
     private String pedidoLogQueue;
@@ -32,12 +34,24 @@ public class PedidoConsumer {
     @Value("${sqs.queues.pedido_nota_fiscal}")
     private String pedidoNotaFiscalQueue;
 
+    private CommonPedidoMessage read(String raw) {
+        JsonMapper mapper = JsonMapper.builder()
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build();
+        try {
+            return mapper.readValue(raw, CommonPedidoMessage.class);
+        } catch (JsonProcessingException e) {
+            return null;
+        }
+    }
+
     @SqsListener(queueNames = "${sqs.queues.pedido_log}")
     public void consumePedidoLog(String message) {
         try {
             log.info("Recebendo mensagem da fila {}: {}", pedidoLogQueue, message);
 
-            CommonPedidoMessage pedidoMessage = objectMapper.readValue(message, CommonPedidoMessage.class);
+            CommonPedidoMessage pedidoMessage = this.read(message);
             UUID pedidoId = pedidoMessage.getPedidoId();
 
             Pedido pedido = pedidoRepository.findById(pedidoId)
@@ -57,7 +71,7 @@ public class PedidoConsumer {
         try {
             log.info("Recebendo mensagem da fila {}: {}", pedidoNotaFiscalQueue, message);
 
-            CommonPedidoMessage pedidoMessage = objectMapper.readValue(message, CommonPedidoMessage.class);
+            CommonPedidoMessage pedidoMessage = this.read(message);
             UUID pedidoId = pedidoMessage.getPedidoId();
 
             Pedido pedido = pedidoRepository.findById(pedidoId)
@@ -80,7 +94,7 @@ public class PedidoConsumer {
         try {
             log.info("Recebendo mensagem da fila {}: {}", pedidoEmailQueue, message);
 
-            CommonPedidoMessage pedidoMessage = objectMapper.readValue(message, CommonPedidoMessage.class);
+            CommonPedidoMessage pedidoMessage = this.read(message);
             UUID pedidoId = pedidoMessage.getPedidoId();
 
             Pedido pedido = pedidoRepository.findById(pedidoId)

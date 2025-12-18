@@ -50,7 +50,7 @@ public class PedidoService {
                 pedido.setValorTotal(valorTotal);
 
                 for (ItemPedido item : itens) {
-                        estoqueService.removerQuantidade(item.getProduto().getId(), item.getQuantidade());
+                        estoqueService.adicionarQuantidade(item.getProduto().getId(), -(item.getQuantidade() != null ? item.getQuantidade(): 0));
                 }
 
                 Pedido pedidoSalvo = pedidoRepository.save(pedido);
