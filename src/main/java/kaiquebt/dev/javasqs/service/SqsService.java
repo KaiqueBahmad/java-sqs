@@ -5,6 +5,9 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.awspring.cloud.sqs.operations.SqsTemplate;
 import lombok.RequiredArgsConstructor;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
@@ -19,6 +22,16 @@ public class SqsService {
 
     private final SqsTemplate sqsTemplate;
     private final SqsAsyncClient sqsAsyncClient;
+    private final ObjectMapper objectMapper;
+
+    public void sendObjectMessage(String queueName, Object payload) {
+        try {
+            String jsonMessage = objectMapper.writeValueAsString(payload);
+            this.sendMessage(queueName, jsonMessage);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Erro ao converter objeto para JSON", e);
+        }
+    }
 
     public void sendMessage(String queueName, String messageBody) {
         sqsTemplate.send(queueName, messageBody);

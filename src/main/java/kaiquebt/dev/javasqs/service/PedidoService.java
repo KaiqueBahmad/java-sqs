@@ -25,90 +25,96 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class PedidoService {
 
-    private final PedidoRepository pedidoRepository;
-    private final ProdutoRepository produtoRepository;
-    private final PedidoMapper pedidoMapper;
-    private final EstoqueService estoqueService;
+        private final PedidoRepository pedidoRepository;
+        private final ProdutoRepository produtoRepository;
+        private final PedidoMapper pedidoMapper;
+        private final EstoqueService estoqueService;
+        private final PedidoQueueProducer pedidoQueueProducer;
 
-    @Transactional
-    public PedidoDTO criar(PedidoRequestDTO dto) {
-        Pedido pedido = new Pedido();
-        pedido.setNomeCliente(dto.getNomeCliente());
-        pedido.setDataPedido(LocalDateTime.now());
-        pedido.setStatus(StatusPedido.PENDENTE);
+        @Transactional
+        public PedidoDTO criar(PedidoRequestDTO dto) {
+                Pedido pedido = new Pedido();
+                pedido.setNomeCliente(dto.getNomeCliente());
+                pedido.setDataPedido(LocalDateTime.now());
+                pedido.setStatus(StatusPedido.PENDENTE);
 
-        List<ItemPedido> itens = dto.getItens().stream()
-                .map(itemDto -> criarItemPedido(itemDto, pedido))
-                .collect(Collectors.toList());
+                List<ItemPedido> itens = dto.getItens().stream()
+                                .map(itemDto -> criarItemPedido(itemDto, pedido))
+                                .collect(Collectors.toList());
 
-        pedido.setItens(itens);
+                pedido.setItens(itens);
 
-        BigDecimal valorTotal = itens.stream()
-                .map(ItemPedido::getSubtotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        pedido.setValorTotal(valorTotal);
+                BigDecimal valorTotal = itens.stream()
+                                .map(ItemPedido::getSubtotal)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                pedido.setValorTotal(valorTotal);
 
-        // Decrementar estoque para cada item do pedido
-        for (ItemPedido item : itens) {
-            estoqueService.removerQuantidade(item.getProduto().getId(), item.getQuantidade());
+                for (ItemPedido item : itens) {
+                        estoqueService.removerQuantidade(item.getProduto().getId(), item.getQuantidade());
+                }
+
+                Pedido pedidoSalvo = pedidoRepository.save(pedido);
+                
+                pedidoQueueProducer.producePedidoEmail(pedidoSalvo);
+                pedidoQueueProducer.producePedidoLog(pedidoSalvo);
+                pedidoQueueProducer.producePedidoNotaFiscal(pedidoSalvo);
+                
+                return pedidoMapper.toDTO(pedidoSalvo);
         }
 
-        Pedido pedidoSalvo = pedidoRepository.save(pedido);
-        return pedidoMapper.toDTO(pedidoSalvo);
-    }
+        private ItemPedido criarItemPedido(ItemPedidoRequestDTO dto, Pedido pedido) {
+                Produto produto = produtoRepository.findById(dto.getProdutoId())
+                                .orElseThrow(() -> new RuntimeException(
+                                                "Produto não encontrado com id: " + dto.getProdutoId()));
 
-    private ItemPedido criarItemPedido(ItemPedidoRequestDTO dto, Pedido pedido) {
-        Produto produto = produtoRepository.findById(dto.getProdutoId())
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado com id: " + dto.getProdutoId()));
+                ItemPedido item = new ItemPedido();
+                item.setPedido(pedido);
+                item.setProduto(produto);
+                item.setQuantidade(dto.getQuantidade());
+                item.setPrecoUnitario(produto.getPreco());
+                item.setSubtotal(produto.getPreco().multiply(BigDecimal.valueOf(dto.getQuantidade())));
 
-        ItemPedido item = new ItemPedido();
-        item.setPedido(pedido);
-        item.setProduto(produto);
-        item.setQuantidade(dto.getQuantidade());
-        item.setPrecoUnitario(produto.getPreco());
-        item.setSubtotal(produto.getPreco().multiply(BigDecimal.valueOf(dto.getQuantidade())));
+                return item;
+        }
 
-        return item;
-    }
+        public List<PedidoDTO> listarTodos() {
+                return pedidoRepository.findAll()
+                                .stream()
+                                .map(pedidoMapper::toDTO)
+                                .collect(Collectors.toList());
+        }
 
-    public List<PedidoDTO> listarTodos() {
-        return pedidoRepository.findAll()
-                .stream()
-                .map(pedidoMapper::toDTO)
-                .collect(Collectors.toList());
-    }
+        public PedidoDTO buscarPorId(UUID id) {
+                Pedido pedido = pedidoRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Pedido não encontrado com id: " + id));
+                return pedidoMapper.toDTO(pedido);
+        }
 
-    public PedidoDTO buscarPorId(UUID id) {
-        Pedido pedido = pedidoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Pedido não encontrado com id: " + id));
-        return pedidoMapper.toDTO(pedido);
-    }
+        public PedidoDTO atualizar(UUID id, PedidoRequestDTO dto) {
+                Pedido pedido = pedidoRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Pedido não encontrado com id: " + id));
 
-    public PedidoDTO atualizar(UUID id, PedidoRequestDTO dto) {
-        Pedido pedido = pedidoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Pedido não encontrado com id: " + id));
+                pedido.setNomeCliente(dto.getNomeCliente());
 
-        pedido.setNomeCliente(dto.getNomeCliente());
+                List<ItemPedido> itens = dto.getItens().stream()
+                                .map(itemDto -> criarItemPedido(itemDto, pedido))
+                                .collect(Collectors.toList());
 
-        List<ItemPedido> itens = dto.getItens().stream()
-                .map(itemDto -> criarItemPedido(itemDto, pedido))
-                .collect(Collectors.toList());
+                pedido.getItens().clear();
+                pedido.getItens().addAll(itens);
 
-        pedido.getItens().clear();
-        pedido.getItens().addAll(itens);
+                BigDecimal valorTotal = itens.stream()
+                                .map(ItemPedido::getSubtotal)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                pedido.setValorTotal(valorTotal);
 
-        BigDecimal valorTotal = itens.stream()
-                .map(ItemPedido::getSubtotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        pedido.setValorTotal(valorTotal);
+                Pedido pedidoAtualizado = pedidoRepository.save(pedido);
+                return pedidoMapper.toDTO(pedidoAtualizado);
+        }
 
-        Pedido pedidoAtualizado = pedidoRepository.save(pedido);
-        return pedidoMapper.toDTO(pedidoAtualizado);
-    }
-
-    public void deletar(UUID id) {
-        Pedido pedido = pedidoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Pedido não encontrado com id: " + id));
-        pedidoRepository.delete(pedido);
-    }
+        public void deletar(UUID id) {
+                Pedido pedido = pedidoRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Pedido não encontrado com id: " + id));
+                pedidoRepository.delete(pedido);
+        }
 }
