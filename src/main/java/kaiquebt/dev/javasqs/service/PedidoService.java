@@ -55,7 +55,6 @@ public class PedidoService {
 
                 Pedido pedidoSalvo = pedidoRepository.save(pedido);
                 
-                pedidoQueueProducer.producePedidoEmail(pedidoSalvo);
                 pedidoQueueProducer.producePedidoLog(pedidoSalvo);
                 pedidoQueueProducer.producePedidoNotaFiscal(pedidoSalvo);
                 

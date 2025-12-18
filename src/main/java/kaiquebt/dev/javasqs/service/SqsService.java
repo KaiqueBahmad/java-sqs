@@ -6,7 +6,9 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import io.awspring.cloud.sqs.operations.SqsTemplate;
 import lombok.RequiredArgsConstructor;
@@ -22,12 +24,14 @@ public class SqsService {
 
     private final SqsTemplate sqsTemplate;
     private final SqsAsyncClient sqsAsyncClient;
-    private final ObjectMapper objectMapper;
 
     public void sendObjectMessage(String queueName, Object payload) {
         try {
-            String jsonMessage = objectMapper.writeValueAsString(payload);
-            this.sendMessage(queueName, jsonMessage);
+            JsonMapper mapper = JsonMapper.builder()
+                .enable(SerializationFeature.INDENT_OUTPUT)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build();
+            this.sendMessage(queueName, mapper.writeValueAsString(payload));
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Erro ao converter objeto para JSON", e);
         }
@@ -56,7 +60,7 @@ public class SqsService {
             attributes.put(QueueAttributeName.CONTENT_BASED_DEDUPLICATION, "true");
 
             if (!queueName.endsWith(".fifo")) {
-                queueName = queueName + ".fifo";
+                throw new IllegalArgumentException("Nome da fila de tipo FIFO deve terminar com .fifo");
             }
         }
 
