@@ -31,8 +31,17 @@ public class PedidoService {
         private final EstoqueService estoqueService;
         private final PedidoQueueProducer pedidoQueueProducer;
 
-        @Transactional
         public PedidoDTO criar(PedidoRequestDTO dto) {
+                Pedido pedidoSalvo = createOnDatabase(dto);
+
+                pedidoQueueProducer.producePedidoLog(pedidoSalvo);
+                pedidoQueueProducer.producePedidoNotaFiscal(pedidoSalvo);
+                
+                return pedidoMapper.toDTO(pedidoSalvo);
+        }
+        
+        @Transactional
+        private Pedido createOnDatabase(PedidoRequestDTO dto) {
                 Pedido pedido = new Pedido();
                 pedido.setNomeCliente(dto.getNomeCliente());
                 pedido.setDataPedido(LocalDateTime.now());
@@ -54,11 +63,7 @@ public class PedidoService {
                 }
 
                 Pedido pedidoSalvo = pedidoRepository.save(pedido);
-                
-                pedidoQueueProducer.producePedidoLog(pedidoSalvo);
-                pedidoQueueProducer.producePedidoNotaFiscal(pedidoSalvo);
-                
-                return pedidoMapper.toDTO(pedidoSalvo);
+                return pedidoSalvo;
         }
 
         private ItemPedido criarItemPedido(ItemPedidoRequestDTO dto, Pedido pedido) {

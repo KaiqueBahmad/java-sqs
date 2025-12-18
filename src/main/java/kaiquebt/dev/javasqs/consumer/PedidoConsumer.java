@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -47,26 +48,23 @@ public class PedidoConsumer {
     }
 
     @SqsListener(queueNames = "${sqs.queues.pedido_log}")
+    @Transactional
     public void consumePedidoLog(String message) {
-        try {
-            log.info("Recebendo mensagem da fila {}: {}", pedidoLogQueue, message);
+        log.info("Recebendo mensagem da fila {}: {}", pedidoLogQueue, message);
 
-            CommonPedidoMessage pedidoMessage = this.read(message);
-            UUID pedidoId = pedidoMessage.getPedidoId();
+        CommonPedidoMessage pedidoMessage = this.read(message);
+        UUID pedidoId = pedidoMessage.getPedidoId();
 
-            Pedido pedido = pedidoRepository.findById(pedidoId)
-                .orElseThrow(() -> new RuntimeException("Pedido não encontrado: " + pedidoId));
+        Pedido pedido = pedidoRepository.findById(pedidoId)
+            .orElseThrow(() -> new RuntimeException("Pedido não encontrado: " + pedidoId));
 
-            log.info("LOG - Pedido processado: ID={}, Cliente={}, Status={}, Valor={}",
-                pedido.getId(), pedido.getNomeCliente(), pedido.getStatus(), pedido.getValorTotal());
-
-        } catch (Exception e) {
-            log.error("Erro ao processar mensagem da fila pedido_log", e);
-        }
+        log.info("LOG - Pedido processado: ID={}, Cliente={}, Status={}, Valor={}",
+            pedido.getId(), pedido.getNomeCliente(), pedido.getStatus(), pedido.getValorTotal());
     }
 
 
     @SqsListener(queueNames = "${sqs.queues.pedido_nota_fiscal}")
+    @Transactional
     public void consumePedidoNotaFiscal(String message) {
         try {
             log.info("Recebendo mensagem da fila {}: {}", pedidoNotaFiscalQueue, message);
@@ -90,6 +88,7 @@ public class PedidoConsumer {
     }
 
     @SqsListener(queueNames = "${sqs.queues.pedido_email}")
+    @Transactional
     public void consumePedidoEmail(String message) {
         try {
             log.info("Recebendo mensagem da fila {}: {}", pedidoEmailQueue, message);
